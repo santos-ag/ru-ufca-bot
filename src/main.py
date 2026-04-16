@@ -10,6 +10,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from src.bot.formatter import MenuFormatter
 from src.bot.handlers import BotHandlers
 from src.bot.scheduler import NotificationScheduler
+from src.bot.auto_updater import AutoMenuUpdater
 from src.cache.menu_cache import MenuCache, UserManager
 
 load_dotenv()
@@ -36,6 +37,9 @@ def create_bot() -> Application:
 
     # Scheduler precisa do bot da aplicação
     scheduler = NotificationScheduler(app.bot, cache, users, formatter)
+    
+    # Auto updater para atualização automática de cardápios
+    auto_updater = AutoMenuUpdater(cache)
 
     app.add_handler(CommandHandler("start", handlers.start_command))
     app.add_handler(CommandHandler("almoco", handlers.almoco_command))
@@ -45,14 +49,14 @@ def create_bot() -> Application:
     app.add_handler(CommandHandler("help", handlers.help_command))
     app.add_handler(MessageHandler(filters.Document.PDF, handlers.pdf_upload_handler))
 
-    setup_scheduler(app, scheduler)
+    setup_scheduler(app, scheduler, auto_updater)
 
     logger.info("Bot configurado com sucesso.")
     return app
 
 
-def setup_scheduler(app: Application, scheduler: NotificationScheduler) -> None:
-    """Registra os jobs diários de notificação no job_queue."""
+def setup_scheduler(app: Application, scheduler: NotificationScheduler, auto_updater: AutoMenuUpdater) -> None:
+    """Registra os jobs de notificação e atualização automática no job_queue."""
     tz_name = os.environ.get("TIMEZONE", "America/Fortaleza")
     lunch_time_str = os.environ.get("LUNCH_NOTIFICATION_TIME", "10:30")
     dinner_time_str = os.environ.get("DINNER_NOTIFICATION_TIME", "16:30")
@@ -72,9 +76,18 @@ def setup_scheduler(app: Application, scheduler: NotificationScheduler) -> None:
         name="dinner_notification",
     )
 
+    # Job semanal: segunda-feira às 09:00
+    app.job_queue.run_weekly(
+        callback=lambda ctx: auto_updater.update_menu_from_web(),
+        day=0,  # 0 = Monday (0=Seg, 1=Ter, ..., 6=Dom)
+        time=time(9, 0, tzinfo=_get_timezone(tz_name)),
+        name="weekly_menu_update",
+    )
+
     logger.info(
         f"Scheduler configurado: almoço {lunch_time_str}, janta {dinner_time_str} ({tz_name})"
     )
+    logger.info("Auto-update semanal configurado: segunda-feira às 09:00")
 
 
 def _get_timezone(tz_name: str):
