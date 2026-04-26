@@ -77,10 +77,11 @@ def setup_scheduler(app: Application, scheduler: NotificationScheduler, auto_upd
     )
 
     # Job semanal: segunda-feira às 09:00
-    app.job_queue.run_weekly(
+    # Usa run_repeating com intervalo de 7 dias (604800 segundos)
+    app.job_queue.run_repeating(
         callback=lambda ctx: auto_updater.update_menu_from_web(),
-        day=0,  # 0 = Monday (0=Seg, 1=Ter, ..., 6=Dom)
-        time=time(9, 0, tzinfo=_get_timezone(tz_name)),
+        interval=604800,  # 7 dias em segundos
+        first=time(9, 0, tzinfo=_get_timezone(tz_name)),  # Primeira execução segunda-feira 09:00
         name="weekly_menu_update",
     )
 

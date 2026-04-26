@@ -196,13 +196,14 @@ class TestSchedulerSetup:
 
         mock_app = MagicMock()
         mock_scheduler = MagicMock()
+        mock_auto_updater = MagicMock()
 
         with patch.dict("os.environ", {
             "LUNCH_NOTIFICATION_TIME": "10:30",
             "DINNER_NOTIFICATION_TIME": "16:30",
             "TIMEZONE": "America/Fortaleza",
         }):
-            setup_scheduler(mock_app, mock_scheduler)
+            setup_scheduler(mock_app, mock_scheduler, mock_auto_updater)
 
         # Verificar que job_queue.run_daily foi chamado pelo menos 2x (almoço + janta)
         assert mock_app.job_queue.run_daily.call_count >= 2
@@ -219,13 +220,14 @@ class TestSchedulerSetup:
 
         mock_app = MagicMock()
         mock_scheduler = MagicMock()
+        mock_auto_updater = MagicMock()
 
         with patch.dict("os.environ", {
             "LUNCH_NOTIFICATION_TIME": "10:30",
             "DINNER_NOTIFICATION_TIME": "16:30",
             "TIMEZONE": "America/Fortaleza",
         }):
-            setup_scheduler(mock_app, mock_scheduler)
+            setup_scheduler(mock_app, mock_scheduler, mock_auto_updater)
 
         # Exatamente 2 jobs diários: almoço e janta
         assert mock_app.job_queue.run_daily.call_count == 2
