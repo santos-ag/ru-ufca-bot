@@ -15,6 +15,23 @@ Este bot permite que estudantes da UFCA consultem o cardápio do RU de forma rá
 - 🔔 Notificações automáticas nos horários das refeições
 - 📄 Processamento automático de PDFs com cardápios
 - 👤 Sistema de inscrição/desinscrição de notificações
+- ⭐ Sistema de pratos favoritos com botões inline
+- 🔄 Atualização automática semanal via web scraping
+- 🚀 Atualização de cardápio na inicialização do bot
+
+### Comandos do Bot
+
+| Comando | Descrição |
+|---------|-----------|
+| `/start` | Inscreve usuário e envia boas-vindas |
+| `/almoco` | Cardápio do almoço de hoje |
+| `/janta` | Cardápio da janta de hoje |
+| `/semana` | Cardápio da semana completa |
+| `/parar` | Remove das notificações |
+| `/favoritos` | Lista seus pratos favoritos |
+| `/atualizar` | Força busca de cardápio (admin) |
+| `/help` | Lista de comandos |
+| Enviar PDF | Admin envia PDF → processa automaticamente |
 
 ## 🏗️ Arquitetura
 
