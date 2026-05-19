@@ -8,23 +8,35 @@ from typing import Dict, Any, List
 
 logger = logging.getLogger(__name__)
 
-# Configuramos a API do Gemini. 
-# Requer a variável de ambiente GOOGLE_API_KEY no arquivo .env
-genai.configure(api_key=os.environ.get("GOOGLE_API_KEY", ""))
+# Variável global para armazenar a instância do modelo, instanciado de forma tardia (lazy load)
+_model_instance = None
+_llm_configured = False
 
-# Configuramos o modelo
-# Usamos o gemini-1.5-flash pois é muito rápido, grátis e excelente para tarefas de formatação JSON
-try:
-    model = genai.GenerativeModel('gemini-1.5-flash', generation_config={"response_mime_type": "application/json"})
-except Exception as e:
-    logger.warning(f"Não foi possível inicializar o modelo Gemini: {e}")
-    model = None
-
+def get_llm_model():
+    """Inicializa e retorna o modelo do Gemini de forma segura, garantindo que o dotenv já foi carregado."""
+    global _model_instance, _llm_configured
+    
+    api_key = os.environ.get("GOOGLE_API_KEY")
+    if not api_key:
+        return None
+        
+    if not _llm_configured:
+        try:
+            genai.configure(api_key=api_key)
+            _model_instance = genai.GenerativeModel(
+                'gemini-1.5-flash', 
+                generation_config={"response_mime_type": "application/json"}
+            )
+            _llm_configured = True
+        except Exception as e:
+            logger.warning(f"Não foi possível inicializar o modelo Gemini: {e}")
+            return None
+            
+    return _model_instance
 
 def is_llm_available() -> bool:
-    """Verifica se a chave da API do Gemini foi configurada."""
-    return bool(os.environ.get("GOOGLE_API_KEY"))
-
+    """Verifica se a chave da API do Gemini foi configurada e o modelo pode ser inicializado."""
+    return get_llm_model() is not None
 
 def clean_meal_data_with_llm(raw_data: Dict[str, str]) -> Dict[str, Any]:
     """
@@ -37,8 +49,10 @@ def clean_meal_data_with_llm(raw_data: Dict[str, str]) -> Dict[str, Any]:
     Returns:
         Dicionário estruturado, com listas para pratos múltiplos e formatação em Title Case.
     """
-    if not is_llm_available() or model is None:
-        logger.warning("GOOGLE_API_KEY não configurada. Usando fallback simples.")
+    model = get_llm_model()
+    
+    if model is None:
+        logger.warning("GOOGLE_API_KEY não configurada ou modelo indisponível. Usando fallback simples.")
         return _fallback_cleaner(raw_data)
         
     prompt = f"""
