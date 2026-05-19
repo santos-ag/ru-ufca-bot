@@ -172,3 +172,102 @@ class TestMenuFormatter:
         
         assert isinstance(message, str)
         assert "Frango Grelhado" in message
+
+    def test_format_meal_with_keyboard_returns_text_and_markup(self, sample_menu):
+        """
+        Teste: format_meal_with_keyboard deve retornar texto e markup.
+
+        Arrange: Cardápio válido
+        Act: Chamar format_meal_with_keyboard
+        Assert: Retorna tupla (texto, InlineKeyboardMarkup)
+        """
+        from src.bot.formatter import MenuFormatter
+
+        formatter = MenuFormatter()
+        text, markup = formatter.format_meal_with_keyboard(sample_menu, "Almoço", "fav")
+
+        assert isinstance(text, str)
+        assert len(text) > 0
+        assert markup is not None
+
+    def test_format_meal_with_keyboard_has_favorite_button(self, sample_menu):
+        """
+        Teste: Markup deve conter botão de favoritar.
+
+        Arrange: Cardápio válido
+        Act: Chamar format_meal_with_keyboard
+        Assert: Botão com texto contendo 'Favoritar'
+        """
+        from src.bot.formatter import MenuFormatter
+
+        formatter = MenuFormatter()
+        text, markup = formatter.format_meal_with_keyboard(sample_menu, "Almoço", "fav")
+
+        buttons = markup.inline_keyboard[0]
+        assert any("Favoritar" in btn.text for btn in buttons)
+
+    def test_format_meal_with_keyboard_callback_data(self, sample_menu):
+        """
+        Teste: Botão deve ter callback_data correto.
+
+        Arrange: Cardápio válido
+        Act: Chamar format_meal_with_keyboard
+        Assert: callback_data contém o prefixo e tipo de refeição
+        """
+        from src.bot.formatter import MenuFormatter
+
+        formatter = MenuFormatter()
+        text, markup = formatter.format_meal_with_keyboard(sample_menu, "Almoço", "fav")
+
+        buttons = markup.inline_keyboard[0]
+        fav_btn = next(btn for btn in buttons if "Favoritar" in btn.text)
+        assert "fav:almoco" in fav_btn.callback_data
+
+    def test_format_meal_with_keyboard_empty_menu(self):
+        """
+        Teste: Cardápio vazio não deve ter botão de favoritar.
+
+        Arrange: Dict vazio
+        Act: Chamar format_meal_with_keyboard
+        Assert: Markup sem botões
+        """
+        from src.bot.formatter import MenuFormatter
+
+        formatter = MenuFormatter()
+        text, markup = formatter.format_meal_with_keyboard({}, "Almoço", "fav")
+
+        assert len(markup.inline_keyboard) == 0
+
+    def test_format_meal_with_keyboard_no_prato_principal(self):
+        """
+        Teste: Sem prato principal não deve ter botão de favoritar.
+
+        Arrange: Cardápio sem prato_principal
+        Act: Chamar format_meal_with_keyboard
+        Assert: Markup sem botões
+        """
+        from src.bot.formatter import MenuFormatter
+
+        menu = {"acompanhamentos": ["Arroz", "Feijão"]}
+        formatter = MenuFormatter()
+        text, markup = formatter.format_meal_with_keyboard(menu, "Almoço", "fav")
+
+        assert len(markup.inline_keyboard) == 0
+
+    def test_format_meal_with_keyboard_already_favorite(self, sample_menu):
+        """
+        Teste: Se prato já é favorito, botão deve mostrar 'Desfavoritar'.
+
+        Arrange: Cardápio com prato já favoritado
+        Act: Chamar format_meal_with_keyboard com is_favorite=True
+        Assert: Botão com texto 'Desfavoritar'
+        """
+        from src.bot.formatter import MenuFormatter
+
+        formatter = MenuFormatter()
+        text, markup = formatter.format_meal_with_keyboard(
+            sample_menu, "Almoço", "fav", is_favorite=True
+        )
+
+        buttons = markup.inline_keyboard[0]
+        assert any("Desfavoritar" in btn.text for btn in buttons)

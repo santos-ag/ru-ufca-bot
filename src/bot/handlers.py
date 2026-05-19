@@ -11,6 +11,14 @@ from src.scraper.pdf_parser import PDFParser
 from src.scraper.table_menu_extractor import TableMenuExtractor
 
 
+MEAL_KEY_MAP = {
+    "almoco": "almoco",
+    "almoço": "almoco",
+    "janta": "janta",
+    "jantar": "janta",
+}
+
+
 class BotHandlers:
     """Processa comandos do Telegram, integrando cache, usuários e formatador."""
     
@@ -261,3 +269,65 @@ class BotHandlers:
                     os.unlink(tmp_path)
                 except OSError:
                     pass
+
+    async def favorite_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Processa clique em botão inline de favoritar/desfavoritar."""
+        query = update.callback_query
+        await query.answer()
+
+        data = query.data
+        if ":" not in data:
+            return
+
+        action, meal_type = data.split(":", 1)
+        meal_key = MEAL_KEY_MAP.get(meal_type)
+        if not meal_key:
+            return
+
+        user_id = query.from_user.id
+        today = datetime.now().strftime("%Y-%m-%d")
+        menu_data = self.cache.get_menu(today)
+
+        if not menu_data or meal_key not in menu_data:
+            await query.edit_message_text("❌ Cardápio não disponível para hoje.")
+            return
+
+        prato = menu_data[meal_key].get("prato_principal", "")
+        if not prato:
+            return
+
+        if action == "fav":
+            self.users.add_favorite(user_id, prato)
+            is_favorite = True
+        elif action == "unfav":
+            self.users.remove_favorite(user_id, prato)
+            is_favorite = False
+        else:
+            return
+
+        text, reply_markup = self.formatter.format_meal_with_keyboard(
+            menu_data[meal_key], meal_type.capitalize(), "fav", is_favorite=is_favorite
+        )
+        await query.edit_message_reply_markup(reply_markup=reply_markup)
+
+    async def favoritos_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Lista os pratos favoritos do usuário."""
+        if not update.message:
+            return
+
+        user_id = update.effective_user.id
+        favorites = self.users.get_favorites(user_id)
+
+        if not favorites:
+            await update.message.reply_text(
+                "⭐ Você ainda não tem pratos favoritos.\n\n"
+                "Clique em '☆ Favoritar' nas notificações de cardápio para salvar seus preferidos!",
+                parse_mode="Markdown"
+            )
+            return
+
+        lines = ["⭐ *SEUS FAVORITOS*\n"]
+        for dish in favorites:
+            lines.append(f"• {dish}")
+
+        await update.message.reply_text("\n".join(lines), parse_mode="Markdown")

@@ -177,7 +177,7 @@ class TestUserManager:
         
         with open(users_file) as f:
             data = json.load(f)
-        assert data == {"chat_ids": [], "admin_ids": []}
+        assert data == {"chat_ids": [], "admin_ids": [], "favorites": {}}
     
     def test_add_user_adds_new_chat_id(self, users_file):
         """
@@ -209,3 +209,160 @@ class TestUserManager:
         manager.remove_user(123456789)
         
         assert not manager.is_subscribed(123456789)
+
+    def test_add_favorite_adds_new_favorite(self, users_file):
+        """
+        Teste: Deve adicionar prato favorito para um usuário.
+
+        Arrange: Usuário existente
+        Act: Adicionar favorito
+        Assert: Favorito na lista do usuário
+        """
+        from src.cache.menu_cache import UserManager
+
+        manager = UserManager(users_file)
+        manager.add_user(123456789)
+        manager.add_favorite(123456789, "Frango Grelhado")
+
+        assert manager.is_favorite(123456789, "Frango Grelhado")
+
+    def test_add_favorite_is_idempotent(self, users_file):
+        """
+        Teste: Adicionar mesmo favorito duas vezes não deve duplicar.
+
+        Arrange: Favorito já existe
+        Act: Adicionar novamente
+        Assert: Apenas uma ocorrência na lista
+        """
+        from src.cache.menu_cache import UserManager
+
+        manager = UserManager(users_file)
+        manager.add_user(123456789)
+        manager.add_favorite(123456789, "Frango Grelhado")
+        manager.add_favorite(123456789, "Frango Grelhado")
+
+        favorites = manager.get_favorites(123456789)
+        assert favorites.count("Frango Grelhado") == 1
+
+    def test_remove_favorite_removes_existing(self, users_file):
+        """
+        Teste: Deve remover favorito existente.
+
+        Arrange: Usuário com favorito
+        Act: Remover favorito
+        Assert: Favorito não está mais na lista
+        """
+        from src.cache.menu_cache import UserManager
+
+        manager = UserManager(users_file)
+        manager.add_user(123456789)
+        manager.add_favorite(123456789, "Frango Grelhado")
+        manager.remove_favorite(123456789, "Frango Grelhado")
+
+        assert not manager.is_favorite(123456789, "Frango Grelhado")
+
+    def test_remove_favorite_handles_nonexistent(self, users_file):
+        """
+        Teste: Remover favorito inexistente não deve lançar erro.
+
+        Arrange: Usuário sem favoritos
+        Act: Remover favorito inexistente
+        Assert: Não lança exceção
+        """
+        from src.cache.menu_cache import UserManager
+
+        manager = UserManager(users_file)
+        manager.add_user(123456789)
+
+        manager.remove_favorite(123456789, "Prato Inexistente")
+
+    def test_get_favorites_returns_list(self, users_file):
+        """
+        Teste: Deve retornar lista de favoritos do usuário.
+
+        Arrange: Usuário com 3 favoritos
+        Act: Chamar get_favorites
+        Assert: Retorna lista com 3 itens
+        """
+        from src.cache.menu_cache import UserManager
+
+        manager = UserManager(users_file)
+        manager.add_user(123456789)
+        manager.add_favorite(123456789, "Frango Grelhado")
+        manager.add_favorite(123456789, "Peixe Assado")
+        manager.add_favorite(123456789, "Lasanha de Soja")
+
+        favorites = manager.get_favorites(123456789)
+
+        assert len(favorites) == 3
+        assert "Frango Grelhado" in favorites
+        assert "Peixe Assado" in favorites
+        assert "Lasanha de Soja" in favorites
+
+    def test_get_favorites_returns_empty_for_new_user(self, users_file):
+        """
+        Teste: Usuário sem favoritos deve retornar lista vazia.
+
+        Arrange: Usuário recém-inscrito
+        Act: Chamar get_favorites
+        Assert: Retorna lista vazia
+        """
+        from src.cache.menu_cache import UserManager
+
+        manager = UserManager(users_file)
+        manager.add_user(123456789)
+
+        favorites = manager.get_favorites(123456789)
+
+        assert favorites == []
+
+    def test_is_favorite_returns_false_for_nonexistent(self, users_file):
+        """
+        Teste: is_favorite deve retornar False para prato não favoritado.
+
+        Arrange: Usuário sem favoritos
+        Act: Verificar prato inexistente
+        Assert: Retorna False
+        """
+        from src.cache.menu_cache import UserManager
+
+        manager = UserManager(users_file)
+        manager.add_user(123456789)
+
+        assert not manager.is_favorite(123456789, "Frango Grelhado")
+
+    def test_favorites_persist_across_instances(self, users_file):
+        """
+        Teste: Favoritos devem persistir ao recriar UserManager.
+
+        Arrange: Salvar favoritos
+        Act: Criar nova instância
+        Assert: Favoritos ainda presentes
+        """
+        from src.cache.menu_cache import UserManager
+
+        manager = UserManager(users_file)
+        manager.add_user(123456789)
+        manager.add_favorite(123456789, "Frango Grelhado")
+
+        manager2 = UserManager(users_file)
+
+        assert manager2.is_favorite(123456789, "Frango Grelhado")
+
+    def test_init_migrates_old_users_file_without_favorites_key(self, users_file):
+        """
+        Teste: Deve adicionar chave 'favorites' em arquivo antigo sem ela.
+
+        Arrange: Arquivo com estrutura antiga (sem favorites)
+        Act: Criar UserManager
+        Assert: Chave 'favorites' adicionada
+        """
+        from src.cache.menu_cache import UserManager
+
+        with open(users_file, "w") as f:
+            json.dump({"chat_ids": [123], "admin_ids": []}, f)
+
+        manager = UserManager(users_file)
+
+        assert "favorites" in manager._data
+        assert manager._data["favorites"] == {}

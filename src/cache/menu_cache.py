@@ -60,7 +60,7 @@ class UserManager:
     
     def __init__(self, users_file: Union[str, Path]):
         self.users_file = Path(users_file)
-        self._data: Dict[str, List[int]] = {"chat_ids": [], "admin_ids": []}
+        self._data: Dict[str, Any] = {"chat_ids": [], "admin_ids": [], "favorites": {}}
         self._load_users()
     
     def _load_users(self) -> None:
@@ -69,17 +69,18 @@ class UserManager:
             try:
                 with open(self.users_file, 'r', encoding='utf-8') as f:
                     self._data = json.load(f)
-                    # Garante que as chaves esperadas existam
                     if "chat_ids" not in self._data:
                         self._data["chat_ids"] = []
                     if "admin_ids" not in self._data:
                         self._data["admin_ids"] = []
+                    if "favorites" not in self._data:
+                        self._data["favorites"] = {}
+                        self._save_users()
             except (json.JSONDecodeError, IOError):
-                # Arquivo corrompido — começa do zero
-                self._data = {"chat_ids": [], "admin_ids": []}
+                self._data = {"chat_ids": [], "admin_ids": [], "favorites": {}}
                 self._save_users()
         else:
-            self._data = {"chat_ids": [], "admin_ids": []}
+            self._data = {"chat_ids": [], "admin_ids": [], "favorites": {}}
             self._save_users()
     
     def _save_users(self) -> None:
@@ -108,3 +109,29 @@ class UserManager:
     def get_all_users(self) -> List[int]:
         """Retorna todos os chat_ids inscritos."""
         return self._data["chat_ids"]
+
+    def add_favorite(self, chat_id: int, dish_name: str) -> None:
+        """Adiciona um prato como favorito para o usuário (idempotente)."""
+        chat_id_str = str(chat_id)
+        if chat_id_str not in self._data["favorites"]:
+            self._data["favorites"][chat_id_str] = []
+        if dish_name not in self._data["favorites"][chat_id_str]:
+            self._data["favorites"][chat_id_str].append(dish_name)
+            self._save_users()
+
+    def remove_favorite(self, chat_id: int, dish_name: str) -> None:
+        """Remove um prato favorito do usuário (idempotente)."""
+        chat_id_str = str(chat_id)
+        if chat_id_str in self._data["favorites"]:
+            if dish_name in self._data["favorites"][chat_id_str]:
+                self._data["favorites"][chat_id_str].remove(dish_name)
+                self._save_users()
+
+    def get_favorites(self, chat_id: int) -> List[str]:
+        """Retorna a lista de pratos favoritos do usuário."""
+        chat_id_str = str(chat_id)
+        return self._data.get("favorites", {}).get(chat_id_str, [])
+
+    def is_favorite(self, chat_id: int, dish_name: str) -> bool:
+        """Retorna True se o prato for favorito do usuário."""
+        return dish_name in self.get_favorites(chat_id)

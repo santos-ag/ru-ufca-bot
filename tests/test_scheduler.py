@@ -48,6 +48,8 @@ class TestNotificationScheduler:
         user_mgr = Mock()
         user_mgr.get_all_users.return_value = [12345, 67890, 11111]
         user_mgr.remove_user = Mock()
+        user_mgr.is_favorite.return_value = False
+        user_mgr.get_favorites.return_value = []
         return user_mgr
     
     @pytest.fixture
@@ -93,8 +95,8 @@ class TestNotificationScheduler:
         today = datetime.now().strftime("%Y-%m-%d")
         mock_cache.get_menu.assert_called_once_with(today)
         
-        # Verificar que formatou o almoço
-        mock_formatter.format_meal.assert_called_once()
+        # Verificar que formatou o almoço (uma vez por usuário)
+        assert mock_formatter.format_meal.call_count == 3
         
         # Verificar que enviou para todos os usuários
         assert mock_bot.send_message.call_count == 3
@@ -117,8 +119,8 @@ class TestNotificationScheduler:
         today = datetime.now().strftime("%Y-%m-%d")
         mock_cache.get_menu.assert_called_once_with(today)
         
-        # Verificar que formatou a janta
-        mock_formatter.format_meal.assert_called_once()
+        # Verificar que formatou a janta (uma vez por usuário)
+        assert mock_formatter.format_meal.call_count == 3
         
         # Verificar que enviou para todos os usuários
         assert mock_bot.send_message.call_count == 3
@@ -223,6 +225,47 @@ class TestNotificationScheduler:
         mock_cache.get_menu.return_value = {"janta": {"prato_principal": "Peixe"}}
         scheduler = NotificationScheduler(mock_bot, mock_cache, mock_user_manager, mock_formatter)
         await scheduler.send_lunch_notification()
-        
+
         # Verificar que NÃO enviou mensagens
         mock_bot.send_message.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_favorite_notification_prepends_alert(self, mock_bot, mock_cache, mock_user_manager, mock_formatter):
+        """
+        Teste: Se prato é favorito do usuário, deve prepend alert de favorito.
+
+        Arrange: Usuário 12345 tem "Frango Grelhado" como favorito
+        Act: Chamar send_lunch_notification
+        Assert: Mensagem para usuário 12345 contém alerta de favorito
+        """
+        from src.bot.scheduler import NotificationScheduler
+
+        mock_user_manager.is_favorite.return_value = True
+        mock_user_manager.get_all_users.return_value = [12345]
+
+        scheduler = NotificationScheduler(mock_bot, mock_cache, mock_user_manager, mock_formatter)
+        await scheduler.send_lunch_notification()
+
+        call_args = mock_bot.send_message.call_args
+        assert "🌟" in call_args[1]["text"] or "favorito" in call_args[1]["text"].lower()
+
+    @pytest.mark.asyncio
+    async def test_non_favorite_notification_no_alert(self, mock_bot, mock_cache, mock_user_manager, mock_formatter):
+        """
+        Teste: Se prato NÃO é favorito, mensagem normal sem alerta.
+
+        Arrange: Usuário tem favoritos diferentes do prato do dia
+        Act: Chamar send_lunch_notification
+        Assert: Mensagem NÃO contém alerta de favorito
+        """
+        from src.bot.scheduler import NotificationScheduler
+
+        mock_user_manager.get_favorites.return_value = ["Lasanha de Soja"]
+        mock_user_manager.is_favorite.return_value = False
+        mock_user_manager.get_all_users.return_value = [12345]
+
+        scheduler = NotificationScheduler(mock_bot, mock_cache, mock_user_manager, mock_formatter)
+        await scheduler.send_lunch_notification()
+
+        call_args = mock_bot.send_message.call_args
+        assert "🌟" not in call_args[1]["text"]

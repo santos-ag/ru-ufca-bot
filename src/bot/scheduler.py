@@ -25,8 +25,34 @@ class NotificationScheduler:
             logger.info(f"{meal_name} menu not available for {today}, skipping notification")
             return
         
-        formatted_message = self.formatter.format_meal(menu_data[meal_key], meal_type)
-        await self._broadcast_to_users(formatted_message)
+        meal = menu_data[meal_key]
+        prato_principal = meal.get("prato_principal", "")
+        
+        user_ids = self.users.get_all_users()
+        for user_id in user_ids:
+            try:
+                formatted_message = self.formatter.format_meal(meal, meal_type)
+                
+                if prato_principal and self.users.is_favorite(user_id, prato_principal):
+                    formatted_message = (
+                        f"🌟 *ALERTA DE FAVORITO!* 🌟\n\n"
+                        f"_{prato_principal}_ está no cardápio de hoje!\n\n"
+                        + formatted_message
+                    )
+                
+                await self.bot.send_message(
+                    chat_id=user_id,
+                    text=formatted_message,
+                    parse_mode="Markdown"
+                )
+                logger.debug(f"Notification sent to user {user_id}")
+                
+            except Forbidden:
+                self.users.remove_user(user_id)
+                logger.info(f"User {user_id} blocked bot, removed from list")
+                
+            except TelegramError as e:
+                logger.error(f"Failed to send notification to user {user_id}: {e}")
     
     async def send_lunch_notification(self):
         """Dispara a notificação do almoço (agendada para 10:30)."""

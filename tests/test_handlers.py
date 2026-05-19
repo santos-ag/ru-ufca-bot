@@ -613,3 +613,213 @@ class TestAtualizarCommand:
         calls = mock_update_admin.message.reply_text.call_args_list
         success_call = calls[-1][0][0]
         assert "semana" in success_call.lower()
+
+
+class TestFavoriteCallbackHandler:
+    """
+    Testes para o handler de callback de favoritos (botões inline).
+    """
+
+    @pytest.fixture
+    def mock_cache(self):
+        cache = Mock()
+        cache.get_menu.return_value = {
+            "almoco": {"prato_principal": "Frango Grelhado"},
+            "janta": {"prato_principal": "Peixe Assado"},
+        }
+        return cache
+
+    @pytest.fixture
+    def mock_user_manager(self):
+        mgr = Mock()
+        mgr.is_favorite.return_value = False
+        mgr.add_favorite = Mock()
+        mgr.remove_favorite = Mock()
+        return mgr
+
+    @pytest.fixture
+    def mock_formatter(self):
+        formatter = Mock()
+        formatter.format_meal_with_keyboard.return_value = (
+            "🍽️ ALMOÇO\n\n🍗 Principal: Frango Grelhado",
+            Mock(inline_keyboard=[[Mock(text="☆ Favoritar Frango Grelhado")]])
+        )
+        return formatter
+
+    @pytest.fixture
+    def mock_auto_updater(self):
+        return Mock()
+
+    @pytest.fixture
+    def mock_context(self):
+        return Mock()
+
+    def _make_callback_update(self, data: str, user_id: int = 12345):
+        """Helper para criar um Update com CallbackQuery mock."""
+        query = Mock()
+        query.data = data
+        query.from_user.id = user_id
+        query.answer = AsyncMock()
+        query.edit_message_text = AsyncMock()
+        query.edit_message_reply_markup = AsyncMock()
+
+        update = Mock()
+        update.callback_query = query
+        return update
+
+    @pytest.mark.asyncio
+    async def test_favorite_callback_adds_favorite(
+        self, mock_cache, mock_user_manager, mock_formatter,
+        mock_auto_updater, mock_context
+    ):
+        """
+        Teste: Callback 'fav:almoco' deve adicionar prato como favorito.
+        """
+        from src.bot.handlers import BotHandlers
+
+        handlers = BotHandlers(mock_cache, mock_user_manager, mock_formatter, mock_auto_updater)
+        update = self._make_callback_update("fav:almoco")
+
+        await handlers.favorite_callback(update, mock_context)
+
+        mock_user_manager.add_favorite.assert_called_once_with(12345, "Frango Grelhado")
+
+    @pytest.mark.asyncio
+    async def test_unfavorite_callback_removes_favorite(
+        self, mock_cache, mock_user_manager, mock_formatter,
+        mock_auto_updater, mock_context
+    ):
+        """
+        Teste: Callback 'unfav:almoco' deve remover prato dos favoritos.
+        """
+        from src.bot.handlers import BotHandlers
+
+        handlers = BotHandlers(mock_cache, mock_user_manager, mock_formatter, mock_auto_updater)
+        update = self._make_callback_update("unfav:almoco")
+
+        await handlers.favorite_callback(update, mock_context)
+
+        mock_user_manager.remove_favorite.assert_called_once_with(12345, "Frango Grelhado")
+
+    @pytest.mark.asyncio
+    async def test_favorite_callback_edits_message(
+        self, mock_cache, mock_user_manager, mock_formatter,
+        mock_auto_updater, mock_context
+    ):
+        """
+        Teste: Callback deve editar a mensagem com novo markup.
+        """
+        from src.bot.handlers import BotHandlers
+
+        handlers = BotHandlers(mock_cache, mock_user_manager, mock_formatter, mock_auto_updater)
+        update = self._make_callback_update("fav:almoco")
+
+        await handlers.favorite_callback(update, mock_context)
+
+        update.callback_query.edit_message_reply_markup.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_favorite_callback_invalid_data(
+        self, mock_cache, mock_user_manager, mock_formatter,
+        mock_auto_updater, mock_context
+    ):
+        """
+        Teste: Callback com dados inválidos não deve causar erro.
+        """
+        from src.bot.handlers import BotHandlers
+
+        handlers = BotHandlers(mock_cache, mock_user_manager, mock_formatter, mock_auto_updater)
+        update = self._make_callback_update("dados_invalidos")
+
+        await handlers.favorite_callback(update, mock_context)
+
+        mock_user_manager.add_favorite.assert_not_called()
+        mock_user_manager.remove_favorite.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_favorite_callback_no_menu_available(
+        self, mock_cache, mock_user_manager, mock_formatter,
+        mock_auto_updater, mock_context
+    ):
+        """
+        Teste: Se não há cardápio, não deve adicionar favorito.
+        """
+        from src.bot.handlers import BotHandlers
+
+        mock_cache.get_menu.return_value = None
+        handlers = BotHandlers(mock_cache, mock_user_manager, mock_formatter, mock_auto_updater)
+        update = self._make_callback_update("fav:almoco")
+
+        await handlers.favorite_callback(update, mock_context)
+
+        mock_user_manager.add_favorite.assert_not_called()
+
+
+class TestFavoritosCommand:
+    """
+    Testes para o comando /favoritos.
+    """
+
+    @pytest.fixture
+    def mock_cache(self):
+        return Mock()
+
+    @pytest.fixture
+    def mock_user_manager(self):
+        mgr = Mock()
+        mgr.get_favorites.return_value = ["Frango Grelhado", "Peixe Assado"]
+        return mgr
+
+    @pytest.fixture
+    def mock_formatter(self):
+        return Mock()
+
+    @pytest.fixture
+    def mock_auto_updater(self):
+        return Mock()
+
+    @pytest.fixture
+    def mock_update(self):
+        update = Mock()
+        update.effective_user.id = 12345
+        update.message.reply_text = AsyncMock()
+        return update
+
+    @pytest.fixture
+    def mock_context(self):
+        return Mock()
+
+    @pytest.mark.asyncio
+    async def test_favoritos_shows_list(
+        self, mock_cache, mock_user_manager, mock_formatter,
+        mock_auto_updater, mock_update, mock_context
+    ):
+        """
+        Teste: /favoritos deve listar pratos favoritos.
+        """
+        from src.bot.handlers import BotHandlers
+
+        handlers = BotHandlers(mock_cache, mock_user_manager, mock_formatter, mock_auto_updater)
+        await handlers.favoritos_command(mock_update, mock_context)
+
+        mock_update.message.reply_text.assert_called_once()
+        call_args = mock_update.message.reply_text.call_args[0][0]
+        assert "Frango Grelhado" in call_args
+        assert "Peixe Assado" in call_args
+
+    @pytest.mark.asyncio
+    async def test_favoritos_empty_list(
+        self, mock_cache, mock_user_manager, mock_formatter,
+        mock_auto_updater, mock_update, mock_context
+    ):
+        """
+        Teste: /favoritos deve informar quando não há favoritos.
+        """
+        from src.bot.handlers import BotHandlers
+
+        mock_user_manager.get_favorites.return_value = []
+        handlers = BotHandlers(mock_cache, mock_user_manager, mock_formatter, mock_auto_updater)
+        await handlers.favoritos_command(mock_update, mock_context)
+
+        call_args = mock_update.message.reply_text.call_args[0][0]
+        assert "nenhum" in call_args.lower() or "favorito" in call_args.lower()

@@ -5,7 +5,7 @@ import logging
 from datetime import time
 
 from dotenv import load_dotenv
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 
 from src.bot.formatter import MenuFormatter
 from src.bot.handlers import BotHandlers
@@ -59,8 +59,10 @@ def create_bot() -> Application:
     app.add_handler(CommandHandler("semana", handlers.semana_command))
     app.add_handler(CommandHandler("parar", handlers.parar_command))
     app.add_handler(CommandHandler("atualizar", handlers.atualizar_command))
+    app.add_handler(CommandHandler("favoritos", handlers.favoritos_command))
     app.add_handler(CommandHandler("help", handlers.help_command))
     app.add_handler(MessageHandler(filters.Document.PDF, handlers.pdf_upload_handler))
+    app.add_handler(CallbackQueryHandler(handlers.favorite_callback))
 
     setup_scheduler(app, scheduler, auto_updater)
 

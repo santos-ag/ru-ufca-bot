@@ -1,7 +1,9 @@
 """Formata cardápios em mensagens com emojis para o Telegram."""
 
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 
 class MenuFormatter:
@@ -88,3 +90,28 @@ class MenuFormatter:
             lines.append(self.format_meal(menu_data["janta"], "Jantar"))
         
         return "\n".join(lines)
+
+    def format_meal_with_keyboard(
+        self,
+        menu_data: Dict[str, Any],
+        meal_type: str,
+        callback_prefix: str,
+        is_favorite: bool = False,
+    ) -> Tuple[str, InlineKeyboardMarkup]:
+        """Monta o bloco de texto de uma refeição com botão inline de favoritar."""
+        text = self.format_meal(menu_data, meal_type)
+
+        buttons = []
+        prato = menu_data.get("prato_principal")
+        if prato:
+            meal_key = meal_type.lower().replace("ç", "c").replace("ã", "a")
+            if is_favorite:
+                btn_text = f"☆ Desfavoritar {prato}"
+                callback_data = f"unfav:{meal_key}"
+            else:
+                btn_text = f"☆ Favoritar {prato}"
+                callback_data = f"fav:{meal_key}"
+            buttons.append(InlineKeyboardButton(btn_text, callback_data=callback_data))
+
+        keyboard = [buttons] if buttons else []
+        return text, InlineKeyboardMarkup(keyboard)
