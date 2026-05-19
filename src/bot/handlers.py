@@ -123,33 +123,8 @@ class BotHandlers:
             )
             return
         
-        # Adiciona botões inline para favoritar refeições de hoje
-        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-        today = datetime.now().strftime("%Y-%m-%d")
-        today_menu = weekly_menu.get(today, {})
-        user_id = update.effective_user.id
-        buttons = []
-        
-        if "almoco" in today_menu:
-            prato = today_menu["almoco"].get("prato_principal", "")
-            if prato:
-                is_fav = self.users.is_favorite(user_id, prato)
-                btn_text = f"⭐ {prato}" if is_fav else f"☆ {prato}"
-                callback = f"unfav:almoco" if is_fav else f"fav:almoco"
-                buttons.append(InlineKeyboardButton(btn_text, callback_data=callback))
-        
-        if "janta" in today_menu:
-            prato = today_menu["janta"].get("prato_principal", "")
-            if prato:
-                is_fav = self.users.is_favorite(user_id, prato)
-                btn_text = f"⭐ {prato}" if is_fav else f"☆ {prato}"
-                callback = f"unfav:janta" if is_fav else f"fav:janta"
-                buttons.append(InlineKeyboardButton(btn_text, callback_data=callback))
-        
-        reply_markup = InlineKeyboardMarkup([buttons]) if buttons else None
-        
         await update.message.reply_text(
-            full_message, parse_mode="Markdown", reply_markup=reply_markup
+            full_message, parse_mode="Markdown"
         )
     
     async def parar_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):

@@ -9,8 +9,8 @@ from typing import Dict, Any, List
 logger = logging.getLogger(__name__)
 
 # Configuramos a API do Gemini. 
-# Requer a variável de ambiente GEMINI_API_KEY no arquivo .env
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY", ""))
+# Requer a variável de ambiente GOOGLE_API_KEY no arquivo .env
+genai.configure(api_key=os.environ.get("GOOGLE_API_KEY", ""))
 
 # Configuramos o modelo
 # Usamos o gemini-1.5-flash pois é muito rápido, grátis e excelente para tarefas de formatação JSON
@@ -23,7 +23,7 @@ except Exception as e:
 
 def is_llm_available() -> bool:
     """Verifica se a chave da API do Gemini foi configurada."""
-    return bool(os.environ.get("GEMINI_API_KEY"))
+    return bool(os.environ.get("GOOGLE_API_KEY"))
 
 
 def clean_meal_data_with_llm(raw_data: Dict[str, str]) -> Dict[str, Any]:
@@ -38,7 +38,7 @@ def clean_meal_data_with_llm(raw_data: Dict[str, str]) -> Dict[str, Any]:
         Dicionário estruturado, com listas para pratos múltiplos e formatação em Title Case.
     """
     if not is_llm_available() or model is None:
-        logger.warning("GEMINI_API_KEY não configurada. Usando fallback simples.")
+        logger.warning("GOOGLE_API_KEY não configurada. Usando fallback simples.")
         return _fallback_cleaner(raw_data)
         
     prompt = f"""
