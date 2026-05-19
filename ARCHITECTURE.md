@@ -16,6 +16,7 @@
 | PDF | pdfplumber 0.10.3                            |
 | Web Scraping | requests 2.31.0 + beautifulsoup4 4.12.2  |
 | Scheduler | APScheduler 3.10.4                           |
+| LLM | Gemini (google-generativeai) ou Groq              |
 | Persistência | JSON (data/menu_cache.json, data/users.json) |
 | Deploy | Docker + Digital Ocean                       |
 
@@ -120,14 +121,15 @@ A cada **segunda-feira às 09:00**, o bot executa automaticamente:
    └─→ Retorna lista ordenada pela data de início do cardápio (extraída do título)
 
 2. PDFDownloader
-   └─→ Download do PDF mais recente
-   └─→ Validação: Content-Type = application/pdf
-   └─→ Limite de tamanho: 50 MB
+    └─→ Download do PDF mais recente
+    └─→ Validação: Content-Type = application/pdf
+    └─→ Limite de tamanho: 50 MB
 
 3. Parsing
-   └─→ TableMenuExtractor (método preferido, se houver tabelas)
-   └─→ MenuExtractor (fallback, texto puro)
-   └─→ Organiza cardápios por data
+    └─→ TableMenuExtractor (método preferido, se houver tabelas)
+    └─→ MenuExtractor (fallback, texto puro)
+    └─→ LLM Cleaner (Gemini ou Groq) para estruturar e normalizar campos
+    └─→ Organiza cardápios por data
 
 4. Persistência
    └─→ Salva no cache (data/menu_cache.json)
@@ -224,6 +226,12 @@ ADMIN_CHAT_ID=...
 TIMEZONE=America/Fortaleza
 LUNCH_NOTIFICATION_TIME=10:30
 DINNER_NOTIFICATION_TIME=16:30
+LLM_PROVIDER=gemini  # gemini ou groq
+GOOGLE_API_KEY=...
+GOOGLE_MODEL=gemini-2.0-flash
+GROQ_API_KEY=...
+GROQ_MODEL=llama-3.1-8b-instant
+GROQ_DELAY_SECONDS=0.5
 ```
 
 ---

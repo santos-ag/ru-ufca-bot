@@ -40,6 +40,14 @@ Este projeto segue:
 - **Cobertura de testes:** 80-90%
 - **Linguagem:** Python 3.10+
 
+### LLM (estruturação do cardápio)
+
+O parser usa LLM para limpar e estruturar o conteúdo extraído do PDF, com fallback local caso a API falhe.
+
+Provedores suportados:
+- **Gemini** (padrão): `LLM_PROVIDER=gemini`
+- **Groq**: `LLM_PROVIDER=groq`
+
 Consulte [ARCHITECTURE.md](./ARCHITECTURE.md) para detalhes completos das decisões arquiteturais.
 
 ## 🚀 Setup do Projeto
@@ -74,6 +82,12 @@ pip install -r requirements-dev.txt  # Para desenvolvimento
 cp .env.example .env
 # Edite .env com suas credenciais
 ```
+
+Para escolher a LLM:
+- `LLM_PROVIDER=gemini` ou `LLM_PROVIDER=groq`
+- `GOOGLE_API_KEY` e `GOOGLE_MODEL` (Gemini)
+- `GROQ_API_KEY` e `GROQ_MODEL` (Groq)
+- `GROQ_DELAY_SECONDS` (opcional, default 0.5s para reduzir 429)
 
 5. Execute os testes:
 ```bash
