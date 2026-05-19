@@ -96,22 +96,43 @@ class MenuFormatter:
         menu_data: Dict[str, Any],
         meal_type: str,
         callback_prefix: str,
-        is_favorite: bool = False,
+        favorites_list: list = None,
     ) -> Tuple[str, InlineKeyboardMarkup]:
-        """Monta o bloco de texto de uma refeição com botão inline de favoritar."""
+        """Monta o bloco de texto de uma refeição com botões inline de favoritar para cada prato."""
+        if favorites_list is None:
+            favorites_list = []
+            
         text = self.format_meal(menu_data, meal_type)
 
-        buttons = []
-        prato = menu_data.get("prato_principal")
-        if prato:
-            meal_key = meal_type.lower().replace("ç", "c").replace("ã", "a")
+        keyboard = []
+        prato_data = menu_data.get("prato_principal")
+        
+        # Pode ser string ou lista
+        pratos = prato_data if isinstance(prato_data, list) else [prato_data] if prato_data else []
+        
+        meal_key = meal_type.lower().replace("ç", "c").replace("ã", "a")
+        
+        for prato in pratos:
+            if not prato or prato == "Não disponível":
+                continue
+                
+            # Verificar se este prato específico é favorito
+            is_favorite = prato in favorites_list
+            
             if is_favorite:
                 btn_text = f"☆ Desfavoritar {prato}"
-                callback_data = f"unfav:{meal_key}"
+                callback_data = f"unfav:{meal_key}:{prato}"
             else:
                 btn_text = f"☆ Favoritar {prato}"
-                callback_data = f"fav:{meal_key}"
-            buttons.append(InlineKeyboardButton(btn_text, callback_data=callback_data))
+                callback_data = f"fav:{meal_key}:{prato}"
+                
+            # Limita tamanho do callback_data (limite do telegram é 64 bytes)
+            if len(callback_data.encode('utf-8')) > 64:
+                # Trunca o nome do prato se necessário
+                max_prato_len = 64 - len(f"unfav:{meal_key}:") - 1
+                truncated_prato = prato[:max_prato_len]
+                callback_data = callback_data.replace(prato, truncated_prato)
+                
+            keyboard.append([InlineKeyboardButton(btn_text, callback_data=callback_data)])
 
-        keyboard = [buttons] if buttons else []
         return text, InlineKeyboardMarkup(keyboard)

@@ -259,14 +259,14 @@ class TestMenuFormatter:
         Teste: Se prato já é favorito, botão deve mostrar 'Desfavoritar'.
 
         Arrange: Cardápio com prato já favoritado
-        Act: Chamar format_meal_with_keyboard com is_favorite=True
+        Act: Chamar format_meal_with_keyboard com favorites_list=["Frango Grelhado"]
         Assert: Botão com texto 'Desfavoritar'
         """
         from src.bot.formatter import MenuFormatter
 
         formatter = MenuFormatter()
         text, markup = formatter.format_meal_with_keyboard(
-            sample_menu, "Almoço", "fav", is_favorite=True
+            sample_menu, "Almoço", "fav", favorites_list=["Frango Grelhado"]
         )
 
         buttons = markup.inline_keyboard[0]

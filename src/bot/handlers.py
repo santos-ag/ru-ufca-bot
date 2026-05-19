@@ -45,11 +45,11 @@ class BotHandlers:
         
         meal = menu_data[meal_key]
         user_id = update.effective_user.id
-        prato = meal.get("prato_principal", "")
-        is_fav = prato and self.users.is_favorite(user_id, prato)
+        
+        user_favorites = self.users.get_favorites(user_id)
         
         formatted_message, reply_markup = self.formatter.format_meal_with_keyboard(
-            meal, meal_type, "fav", is_favorite=is_fav
+            meal, meal_type, "fav", favorites_list=user_favorites
         )
         await update.message.reply_text(
             formatted_message, parse_mode="Markdown", reply_markup=reply_markup
@@ -316,8 +316,19 @@ class BotHandlers:
         if ":" not in data:
             return
 
-        action, meal_type = data.split(":", 1)
+        parts = data.split(":", 2)
+        if len(parts) == 3:
+            action, meal_type, prato = parts
+        else:
+            # Fallback para antigo formato caso haja botões pendentes
+            action, meal_type = parts
+            prato = None
+
         meal_key = MEAL_KEY_MAP.get(meal_type)
+        if not meal_key and meal_type in ["almoco", "janta"]:
+            # O meal_type já é o meal_key no novo formato (almoco, janta)
+            meal_key = meal_type
+            
         if not meal_key:
             return
 
@@ -329,21 +340,28 @@ class BotHandlers:
             await query.edit_message_text("❌ Cardápio não disponível para hoje.")
             return
 
-        prato = menu_data[meal_key].get("prato_principal", "")
+        # Se não recebemos o prato do callback (formato antigo), pegamos o primeiro da lista
+        if not prato:
+            prato_data = menu_data[meal_key].get("prato_principal", "")
+            prato = prato_data[0] if isinstance(prato_data, list) and prato_data else prato_data
+
         if not prato:
             return
 
         if action == "fav":
             self.users.add_favorite(user_id, prato)
-            is_favorite = True
         elif action == "unfav":
             self.users.remove_favorite(user_id, prato)
-            is_favorite = False
         else:
             return
 
+        user_favorites = self.users.get_favorites(user_id)
+        
+        # Obter o nome de exibição do meal_type capitalizado (ex: "Almoço") para repassar pro formatador
+        display_meal_type = "Almoço" if meal_key == "almoco" else "Jantar"
+
         text, reply_markup = self.formatter.format_meal_with_keyboard(
-            menu_data[meal_key], meal_type.capitalize(), "fav", is_favorite=is_favorite
+            menu_data[meal_key], display_meal_type, "fav", favorites_list=user_favorites
         )
         await query.edit_message_reply_markup(reply_markup=reply_markup)
 

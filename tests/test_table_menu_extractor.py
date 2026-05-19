@@ -345,7 +345,7 @@ class TestListSplitByComma:
         menus = extractor.extract_menus()
 
         almoco = menus["2026-03-16"]["almoco"]
-        assert "ARROZ BRANCO" in almoco["acompanhamentos"] or \
+        assert "Arroz Branco" in almoco["acompanhamentos"] or \
                any("ARROZ" in item for item in almoco["acompanhamentos"])
 
 
@@ -464,7 +464,7 @@ class TestDateLeakBug:
         menus = extractor.extract_menus()
 
         sobremesa = menus["2026-03-16"]["almoco"]["sobremesa"]
-        assert sobremesa == "MELANCIA", \
+        assert sobremesa == "Melancia", \
             f"Valor incorreto para sobremesa: {sobremesa!r}"
 
     def test_sobremesa_jantar_has_no_date_string(self, table_with_jantar_date_row):

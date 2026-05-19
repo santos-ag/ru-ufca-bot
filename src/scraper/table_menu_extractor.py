@@ -225,39 +225,18 @@ class TableMenuExtractor:
             return ' '.join(parts)
         
         # Extrair cada categoria
-        principal = get_category_text('Principal')
-        vegetariano = get_category_text('Vegetariano')
-        saladas = get_category_text('Saladas')
-        guarnição = get_category_text('Guarnição')
-        acompanhamento = get_category_text('Acompanhamento')
-        suco = get_category_text('Suco')
-        sobremesa = get_category_text('Sobremesa')
+        raw_data = {
+            "principal": get_category_text('Principal'),
+            "vegetariano": get_category_text('Vegetariano'),
+            "saladas": get_category_text('Saladas'),
+            "guarnição": get_category_text('Guarnição'),
+            "acompanhamento": get_category_text('Acompanhamento'),
+            "suco": get_category_text('Suco'),
+            "sobremesa": get_category_text('Sobremesa')
+        }
         
-        # Popular meal_data
-        meal_data["prato_principal"] = sanitize_text(principal[:100]) if principal else "Não disponível"
-        meal_data["vegetariano"] = sanitize_text(vegetariano[:80]) if vegetariano else ""
-
-        # Acompanhamentos: juntar guarnição + acompanhamento, dividindo por vírgula
-        def _split_by_comma(text: str, limit: int) -> List[str]:
-            """Divide texto por vírgula e sanitiza cada item."""
-            if not text:
-                return []
-            items = [sanitize_text(item) for item in text.split(',')]
-            return [item for item in items if item][:limit]
-
-        acomp_parts: List[str] = []
-        if guarnição:
-            acomp_parts.extend(_split_by_comma(guarnição, 3))
-        if acompanhamento:
-            acomp_parts.extend(_split_by_comma(acompanhamento, 3))
-        meal_data["acompanhamentos"] = acomp_parts
-
-        # Saladas como lista — dividir por vírgula (preserva itens compostos como "REPOLHO ROXO")
-        meal_data["saladas"] = _split_by_comma(saladas, 4) if saladas else []
-
-        # Suco e sobremesa — sanitizar e pegar apenas o primeiro item se houver vírgula
-        meal_data["suco"] = sanitize_text(suco.split(',')[0]) if suco else ""
-        meal_data["sobremesa"] = sanitize_text(sobremesa.split(',')[0]) if sobremesa else ""
+        from src.scraper.llm_cleaner import clean_meal_data_with_llm
+        meal_data = clean_meal_data_with_llm(raw_data)
         
         return meal_data
     
