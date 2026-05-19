@@ -48,6 +48,7 @@ class TestBotHandlers:
         user_mgr.add_user.return_value = True
         user_mgr.remove_user.return_value = True
         user_mgr.is_subscribed.return_value = False
+        user_mgr.is_favorite.return_value = False
         return user_mgr
     
     @pytest.fixture
@@ -56,6 +57,10 @@ class TestBotHandlers:
         formatter = Mock()
         formatter.format_meal.return_value = "🍽️ ALMOÇO\n\n🍗 Principal: Frango Grelhado"
         formatter.format_full_menu.return_value = "📅 Cardápio de 14/03 (Sex)\n\n🍽️ ALMOÇO..."
+        formatter.format_meal_with_keyboard.return_value = (
+            "🍽️ ALMOÇO\n\n🍗 Principal: Frango Grelhado",
+            Mock()
+        )
         return formatter
     
     @pytest.fixture
@@ -126,7 +131,7 @@ class TestBotHandlers:
         mock_cache.get_menu.assert_called_once_with(today)
         
         # Verificar que formatou o almoço
-        mock_formatter.format_meal.assert_called_once()
+        mock_formatter.format_meal_with_keyboard.assert_called_once()
         
         # Verificar que enviou mensagem
         mock_update.message.reply_text.assert_called_once()
@@ -150,7 +155,7 @@ class TestBotHandlers:
         mock_cache.get_menu.assert_called_once_with(today)
         
         # Verificar que formatou a janta
-        mock_formatter.format_meal.assert_called_once()
+        mock_formatter.format_meal_with_keyboard.assert_called_once()
         
         # Verificar que enviou mensagem
         mock_update.message.reply_text.assert_called_once()

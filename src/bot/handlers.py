@@ -29,7 +29,7 @@ class BotHandlers:
         self.auto_updater = auto_updater
     
     async def _send_meal_for_today(self, update: Update, meal_type: str, meal_key: str):
-        """Busca o cardápio de hoje no cache e responde ao usuário."""
+        """Busca o cardápio de hoje no cache e responde ao usuário com botões inline."""
         if not update.message:
             return
         
@@ -43,8 +43,17 @@ class BotHandlers:
             )
             return
         
-        formatted_message = self.formatter.format_meal(menu_data[meal_key], meal_type)
-        await update.message.reply_text(formatted_message, parse_mode="Markdown")
+        meal = menu_data[meal_key]
+        user_id = update.effective_user.id
+        prato = meal.get("prato_principal", "")
+        is_fav = prato and self.users.is_favorite(user_id, prato)
+        
+        formatted_message, reply_markup = self.formatter.format_meal_with_keyboard(
+            meal, meal_type, "fav", is_favorite=is_fav
+        )
+        await update.message.reply_text(
+            formatted_message, parse_mode="Markdown", reply_markup=reply_markup
+        )
     
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Inscreve o usuário e envia boas-vindas."""
@@ -77,7 +86,7 @@ class BotHandlers:
         await self._send_meal_for_today(update, "Jantar", "janta")
     
     async def semana_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Mostra o cardápio completo da semana."""
+        """Mostra o cardápio completo da semana com botões inline para hoje."""
         weekly_menu = self.cache.get_weekly_menu()
         
         if not weekly_menu:
@@ -112,8 +121,36 @@ class BotHandlers:
                 "⚠️ Cardápio muito extenso. Use /almoco ou /janta para ver o cardápio de hoje.",
                 parse_mode="Markdown"
             )
-        else:
-            await update.message.reply_text(full_message, parse_mode="Markdown")
+            return
+        
+        # Adiciona botões inline para favoritar refeições de hoje
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        today = datetime.now().strftime("%Y-%m-%d")
+        today_menu = weekly_menu.get(today, {})
+        user_id = update.effective_user.id
+        buttons = []
+        
+        if "almoco" in today_menu:
+            prato = today_menu["almoco"].get("prato_principal", "")
+            if prato:
+                is_fav = self.users.is_favorite(user_id, prato)
+                btn_text = f"⭐ {prato}" if is_fav else f"☆ {prato}"
+                callback = f"unfav:almoco" if is_fav else f"fav:almoco"
+                buttons.append(InlineKeyboardButton(btn_text, callback_data=callback))
+        
+        if "janta" in today_menu:
+            prato = today_menu["janta"].get("prato_principal", "")
+            if prato:
+                is_fav = self.users.is_favorite(user_id, prato)
+                btn_text = f"⭐ {prato}" if is_fav else f"☆ {prato}"
+                callback = f"unfav:janta" if is_fav else f"fav:janta"
+                buttons.append(InlineKeyboardButton(btn_text, callback_data=callback))
+        
+        reply_markup = InlineKeyboardMarkup([buttons]) if buttons else None
+        
+        await update.message.reply_text(
+            full_message, parse_mode="Markdown", reply_markup=reply_markup
+        )
     
     async def parar_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Remove o usuário das notificações."""

@@ -57,6 +57,10 @@ class TestNotificationScheduler:
         """Mock do MenuFormatter."""
         formatter = Mock()
         formatter.format_meal.return_value = "🍽️ ALMOÇO\n\n🍗 Principal: Frango Grelhado"
+        formatter.format_meal_with_keyboard.return_value = (
+            "🍽️ ALMOÇO\n\n🍗 Principal: Frango Grelhado",
+            Mock()
+        )
         return formatter
     
     def test_scheduler_initializes_with_dependencies(self, mock_bot, mock_cache, mock_user_manager, mock_formatter):
@@ -96,7 +100,7 @@ class TestNotificationScheduler:
         mock_cache.get_menu.assert_called_once_with(today)
         
         # Verificar que formatou o almoço (uma vez por usuário)
-        assert mock_formatter.format_meal.call_count == 3
+        assert mock_formatter.format_meal_with_keyboard.call_count == 3
         
         # Verificar que enviou para todos os usuários
         assert mock_bot.send_message.call_count == 3
@@ -120,7 +124,7 @@ class TestNotificationScheduler:
         mock_cache.get_menu.assert_called_once_with(today)
         
         # Verificar que formatou a janta (uma vez por usuário)
-        assert mock_formatter.format_meal.call_count == 3
+        assert mock_formatter.format_meal_with_keyboard.call_count == 3
         
         # Verificar que enviou para todos os usuários
         assert mock_bot.send_message.call_count == 3
@@ -156,7 +160,7 @@ class TestNotificationScheduler:
         from telegram.error import Forbidden
         
         # Configurar send_message para falhar no segundo usuário
-        async def side_effect_send(chat_id, text, parse_mode=None):
+        async def side_effect_send(chat_id, text, parse_mode=None, reply_markup=None):
             if chat_id == 67890:
                 raise Forbidden("Forbidden: bot was blocked by the user")
         
@@ -269,3 +273,25 @@ class TestNotificationScheduler:
 
         call_args = mock_bot.send_message.call_args
         assert "🌟" not in call_args[1]["text"]
+
+    @pytest.mark.asyncio
+    async def test_notification_sends_with_reply_markup(self, mock_bot, mock_cache, mock_user_manager, mock_formatter):
+        """
+        Teste: Notificação deve enviar reply_markup com botões inline.
+
+        Arrange: Cardápio disponível, formatter retorna markup
+        Act: Chamar send_lunch_notification
+        Assert: send_message chamado com reply_markup
+        """
+        from src.bot.scheduler import NotificationScheduler
+        from telegram import InlineKeyboardMarkup
+
+        mock_markup = InlineKeyboardMarkup([])
+        mock_formatter.format_meal_with_keyboard.return_value = ("texto", mock_markup)
+
+        scheduler = NotificationScheduler(mock_bot, mock_cache, mock_user_manager, mock_formatter)
+        await scheduler.send_lunch_notification()
+
+        call_kwargs = mock_bot.send_message.call_args[1]
+        assert "reply_markup" in call_kwargs
+        assert call_kwargs["reply_markup"] is mock_markup

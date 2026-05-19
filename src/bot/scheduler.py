@@ -31,9 +31,12 @@ class NotificationScheduler:
         user_ids = self.users.get_all_users()
         for user_id in user_ids:
             try:
-                formatted_message = self.formatter.format_meal(meal, meal_type)
+                is_fav = prato_principal and self.users.is_favorite(user_id, prato_principal)
+                formatted_message, reply_markup = self.formatter.format_meal_with_keyboard(
+                    meal, meal_type, "fav", is_favorite=is_fav
+                )
                 
-                if prato_principal and self.users.is_favorite(user_id, prato_principal):
+                if is_fav:
                     formatted_message = (
                         f"🌟 *ALERTA DE FAVORITO!* 🌟\n\n"
                         f"_{prato_principal}_ está no cardápio de hoje!\n\n"
@@ -43,7 +46,8 @@ class NotificationScheduler:
                 await self.bot.send_message(
                     chat_id=user_id,
                     text=formatted_message,
-                    parse_mode="Markdown"
+                    parse_mode="Markdown",
+                    reply_markup=reply_markup,
                 )
                 logger.debug(f"Notification sent to user {user_id}")
                 
