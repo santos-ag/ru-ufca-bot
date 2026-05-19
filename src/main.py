@@ -22,6 +22,19 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+async def post_init(app: Application, auto_updater: AutoMenuUpdater) -> None:
+    """Executado após o bot iniciar. Tenta buscar cardápios da web imediatamente."""
+    logger.info("🔄 Tentando atualização inicial de cardápios...")
+    try:
+        success = await auto_updater.update_menu_from_web()
+        if success:
+            logger.info("✅ Cardápios atualizados com sucesso na inicialização")
+        else:
+            logger.warning("⚠️ Falha na atualização inicial de cardápios")
+    except Exception:
+        logger.error("❌ Erro inesperado na atualização inicial de cardápios", exc_info=True)
+
+
 def create_bot() -> Application:
     """Monta a aplicação: instancia componentes, registra handlers e retorna pronto pra rodar."""
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -31,21 +44,21 @@ def create_bot() -> Application:
     cache = MenuCache("data/menu_cache.json")
     users = UserManager("data/users.json")
     formatter = MenuFormatter()
-    handlers = BotHandlers(cache, users, formatter)
-
-    app = Application.builder().token(token).build()
-
-    # Scheduler precisa do bot da aplicação
-    scheduler = NotificationScheduler(app.bot, cache, users, formatter)
-    
-    # Auto updater para atualização automática de cardápios
     auto_updater = AutoMenuUpdater(cache)
+    handlers = BotHandlers(cache, users, formatter, auto_updater)
+
+    app = Application.builder().token(token).post_init(
+        lambda app: post_init(app, auto_updater)
+    ).build()
+
+    scheduler = NotificationScheduler(app.bot, cache, users, formatter)
 
     app.add_handler(CommandHandler("start", handlers.start_command))
     app.add_handler(CommandHandler("almoco", handlers.almoco_command))
     app.add_handler(CommandHandler("janta", handlers.janta_command))
     app.add_handler(CommandHandler("semana", handlers.semana_command))
     app.add_handler(CommandHandler("parar", handlers.parar_command))
+    app.add_handler(CommandHandler("atualizar", handlers.atualizar_command))
     app.add_handler(CommandHandler("help", handlers.help_command))
     app.add_handler(MessageHandler(filters.Document.PDF, handlers.pdf_upload_handler))
 

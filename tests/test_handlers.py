@@ -468,3 +468,148 @@ class TestPdfUploadHandler:
         error_call = calls[-1][0][0]
         assert "erro" in error_call.lower() or "falha" in error_call.lower()
         mock_cache.save_menu.assert_not_called()
+
+
+class TestAtualizarCommand:
+    """
+    Testes para o comando /atualizar — força atualização do cardápio via web.
+    """
+
+    @pytest.fixture
+    def mock_cache(self):
+        cache = Mock()
+        cache.get_menu.return_value = {
+            "almoco": {"prato_principal": "Frango"},
+            "janta": {"prato_principal": "Peixe"},
+        }
+        return cache
+
+    @pytest.fixture
+    def mock_user_manager(self):
+        return Mock()
+
+    @pytest.fixture
+    def mock_formatter(self):
+        return Mock()
+
+    @pytest.fixture
+    def mock_auto_updater(self):
+        updater = Mock()
+        updater.update_menu_from_web = AsyncMock(return_value=True)
+        return updater
+
+    @pytest.fixture
+    def mock_update_admin(self):
+        update = Mock()
+        update.effective_user.id = 999
+        update.message.reply_text = AsyncMock()
+        return update
+
+    @pytest.fixture
+    def mock_update_non_admin(self):
+        update = Mock()
+        update.effective_user.id = 12345
+        update.message.reply_text = AsyncMock()
+        return update
+
+    @pytest.fixture
+    def mock_context(self):
+        return Mock()
+
+    @pytest.mark.asyncio
+    async def test_atualizar_success_admin(
+        self, mock_cache, mock_user_manager, mock_formatter,
+        mock_auto_updater, mock_update_admin, mock_context
+    ):
+        """
+        Teste: Admin executa /atualizar e recebe confirmação de sucesso.
+        """
+        from src.bot.handlers import BotHandlers
+
+        mock_cache.get_menu.return_value = {"almoco": {"prato_principal": "Frango"}}
+
+        handlers = BotHandlers(mock_cache, mock_user_manager, mock_formatter, mock_auto_updater)
+        with patch.dict("os.environ", {"ADMIN_CHAT_ID": "999"}):
+            await handlers.atualizar_command(mock_update_admin, mock_context)
+
+        mock_auto_updater.update_menu_from_web.assert_called_once()
+        calls = mock_update_admin.message.reply_text.call_args_list
+        success_call = calls[-1][0][0]
+        assert "atualizado" in success_call.lower() or "sucesso" in success_call.lower()
+
+    @pytest.mark.asyncio
+    async def test_atualizar_rejected_non_admin(
+        self, mock_cache, mock_user_manager, mock_formatter,
+        mock_auto_updater, mock_update_non_admin, mock_context
+    ):
+        """
+        Teste: Usuário não-admin deve ser rejeitado.
+        """
+        from src.bot.handlers import BotHandlers
+
+        handlers = BotHandlers(mock_cache, mock_user_manager, mock_formatter, mock_auto_updater)
+        with patch.dict("os.environ", {"ADMIN_CHAT_ID": "999"}):
+            await handlers.atualizar_command(mock_update_non_admin, mock_context)
+
+        mock_auto_updater.update_menu_from_web.assert_not_called()
+        mock_update_non_admin.message.reply_text.assert_called_once()
+        call_args = mock_update_non_admin.message.reply_text.call_args[0][0]
+        assert "admin" in call_args.lower() or "permissão" in call_args.lower()
+
+    @pytest.mark.asyncio
+    async def test_atualizar_failure(
+        self, mock_cache, mock_user_manager, mock_formatter,
+        mock_auto_updater, mock_update_admin, mock_context
+    ):
+        """
+        Teste: Quando a atualização falha, deve informar o admin.
+        """
+        from src.bot.handlers import BotHandlers
+
+        mock_auto_updater.update_menu_from_web = AsyncMock(return_value=False)
+
+        handlers = BotHandlers(mock_cache, mock_user_manager, mock_formatter, mock_auto_updater)
+        with patch.dict("os.environ", {"ADMIN_CHAT_ID": "999"}):
+            await handlers.atualizar_command(mock_update_admin, mock_context)
+
+        calls = mock_update_admin.message.reply_text.call_args_list
+        error_call = calls[-1][0][0]
+        assert "falha" in error_call.lower() or "erro" in error_call.lower()
+
+    @pytest.mark.asyncio
+    async def test_atualizar_no_auto_updater_configured(
+        self, mock_cache, mock_user_manager, mock_formatter,
+        mock_update_admin, mock_context
+    ):
+        """
+        Teste: Quando auto_updater é None, deve informar erro.
+        """
+        from src.bot.handlers import BotHandlers
+
+        handlers = BotHandlers(mock_cache, mock_user_manager, mock_formatter, auto_updater=None)
+        with patch.dict("os.environ", {"ADMIN_CHAT_ID": "999"}):
+            await handlers.atualizar_command(mock_update_admin, mock_context)
+
+        mock_update_admin.message.reply_text.assert_called_once()
+        call_args = mock_update_admin.message.reply_text.call_args[0][0]
+        assert "não está configurada" in call_args.lower() or "configurada" in call_args.lower()
+
+    @pytest.mark.asyncio
+    async def test_atualizar_success_no_menu_for_today(
+        self, mock_cache, mock_user_manager, mock_formatter,
+        mock_auto_updater, mock_update_admin, mock_context
+    ):
+        """
+        Teste: Atualização bem-sucedida mas sem cardápio para hoje.
+        """
+        from src.bot.handlers import BotHandlers
+
+        mock_cache.get_menu.return_value = None
+
+        handlers = BotHandlers(mock_cache, mock_user_manager, mock_formatter, mock_auto_updater)
+        with patch.dict("os.environ", {"ADMIN_CHAT_ID": "999"}):
+            await handlers.atualizar_command(mock_update_admin, mock_context)
+
+        calls = mock_update_admin.message.reply_text.call_args_list
+        success_call = calls[-1][0][0]
+        assert "semana" in success_call.lower()

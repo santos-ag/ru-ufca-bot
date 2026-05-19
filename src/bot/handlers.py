@@ -14,10 +14,11 @@ from src.scraper.table_menu_extractor import TableMenuExtractor
 class BotHandlers:
     """Processa comandos do Telegram, integrando cache, usuários e formatador."""
     
-    def __init__(self, menu_cache, user_manager, formatter):
+    def __init__(self, menu_cache, user_manager, formatter, auto_updater=None):
         self.cache = menu_cache
         self.users = user_manager
         self.formatter = formatter
+        self.auto_updater = auto_updater
     
     async def _send_meal_for_today(self, update: Update, meal_type: str, meal_key: str):
         """Busca o cardápio de hoje no cache e responde ao usuário."""
@@ -134,12 +135,57 @@ class BotHandlers:
             "/janta - Ver cardápio da janta de hoje\n"
             "/semana - Ver cardápio da semana completa\n"
             "/parar - Parar de receber notificações\n"
+            "/atualizar - Forçar busca de cardápio (admin)\n"
             "/help - Exibir esta mensagem de ajuda\n\n"
             "💡 *Dica:* Você receberá notificações automáticas "
             "nos horários do almoço e janta!"
         )
         
         await update.message.reply_text(help_message, parse_mode="Markdown")
+
+    async def atualizar_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Força a atualização do cardápio a partir do site da UFCA. Apenas admin."""
+        user_id = update.effective_user.id
+        admin_id = int(os.environ.get("ADMIN_CHAT_ID", "0"))
+
+        if user_id != admin_id:
+            await update.message.reply_text(
+                "⛔ Apenas o administrador pode usar este comando.",
+                parse_mode="Markdown"
+            )
+            return
+
+        if not self.auto_updater:
+            await update.message.reply_text(
+                "❌ Atualização automática não está configurada.",
+                parse_mode="Markdown"
+            )
+            return
+
+        await update.message.reply_text("🔄 Buscando cardápio atualizado no site da UFCA...", parse_mode="Markdown")
+
+        success = await self.auto_updater.update_menu_from_web()
+
+        if success:
+            today = datetime.now().strftime("%Y-%m-%d")
+            menu = self.cache.get_menu(today)
+            if menu:
+                await update.message.reply_text(
+                    f"✅ Cardápio atualizado com sucesso!\n\n"
+                    f"Use /almoco ou /janta para ver o cardápio de hoje.",
+                    parse_mode="Markdown"
+                )
+            else:
+                await update.message.reply_text(
+                    "✅ Cardápios salvos, mas nenhum para hoje.\n"
+                    "Use /semana para ver o cardápio da semana.",
+                    parse_mode="Markdown"
+                )
+        else:
+            await update.message.reply_text(
+                "❌ Falha ao atualizar cardápio. Verifique os logs ou tente novamente mais tarde.",
+                parse_mode="Markdown"
+            )
 
     async def pdf_upload_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """

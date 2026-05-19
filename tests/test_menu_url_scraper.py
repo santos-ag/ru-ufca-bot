@@ -113,18 +113,20 @@ class TestMenuUrlScraper:
 
     @pytest.mark.asyncio
     async def test_get_latest_pdf(self):
-        """Deve retornar o PDF mais recente."""
+        """Deve retornar o PDF com a data de cardápio mais recente (não a data de atualização)."""
         html_content = """
         <div class="ui accordion">
+            <div class="title"><i class="dropdown icon"></i>PRAE/RU/UFCA – Cardápio 11/05/2026 a 15/05/2026</div>
             <div class="content">
                 <p><a class="ui teal button" href='https://documentos.ufca.edu.br/?post_type=doc&p=45616'></a></p>
-                <p style='color: #999; font-size: 0.9em;'>Última atualização: 2026-03-16 12:00:37</p>
+                <p style='color: #999; font-size: 0.9em;'>Última atualização: 2026-05-11 12:00:00</p>
             </div>
         </div>
         <div class="ui accordion">
+            <div class="title"><i class="dropdown icon"></i>PRAE/RU/UFCA – Cardápio 18/05/2026 a 22/05/2026</div>
             <div class="content">
-                <p><a class="ui teal button" href='https://documentos.ufca.edu.br/?post_type=doc&p=45614'></a></p>
-                <p style='color: #999; font-size: 0.9em;'>Última atualização: 2026-03-15 10:00:00</p>
+                <p><a class="ui teal button" href='https://documentos.ufca.edu.br/?post_type=doc&p=45620'></a></p>
+                <p style='color: #999; font-size: 0.9em;'>Última atualização: 2026-04-17 10:00:00</p>
             </div>
         </div>
         """
@@ -139,8 +141,88 @@ class TestMenuUrlScraper:
 
             latest = await scraper.get_latest_pdf()
 
-            # Deve retornar o mais recente (2026-03-16)
-            assert "45616" in latest.url
+            # Deve retornar o cardápio da semana 18-22/05, mesmo com data de atualização mais antiga
+            assert "45620" in latest.url
+            assert "18/05/2026" in latest.titulo
+
+    @pytest.mark.asyncio
+    async def test_sorting_by_title_date_not_cms_date(self):
+        """Deve ordenar pela data do cardápio no título, ignorando a data de atualização do CMS.
+
+        Reproduz o bug real: PDF com data de CMS mais antiga pode ter cardápio mais recente.
+        """
+        html_content = """
+        <div class="ui accordion">
+            <div class="title"><i class="dropdown icon"></i>PRAE/RU/UFCA – Cardápio 11/05/2026 a 15/05/2026</div>
+            <div class="content">
+                <p><a class="ui teal button" href='https://documentos.ufca.edu.br/?post_type=doc&p=46241'></a></p>
+                <p style='color: #999; font-size: 0.9em;'>Última atualização: 2026-05-11 14:00:00</p>
+            </div>
+        </div>
+        <div class="ui accordion">
+            <div class="title"><i class="dropdown icon"></i>PRAE/RU/UFCA – Cardápio 18/05/2026 a 22/05/2026</div>
+            <div class="content">
+                <p><a class="ui teal button" href='https://documentos.ufca.edu.br/?post_type=doc&p=46244'></a></p>
+                <p style='color: #999; font-size: 0.9em;'>Última atualização: 2026-04-17 09:00:00</p>
+            </div>
+        </div>
+        <div class="ui accordion">
+            <div class="title"><i class="dropdown icon"></i>PRAE/RU/UFCA – Cardápio 05/05/2026 a 09/05/2026</div>
+            <div class="content">
+                <p><a class="ui teal button" href='https://documentos.ufca.edu.br/?post_type=doc&p=46239'></a></p>
+                <p style='color: #999; font-size: 0.9em;'>Última atualização: 2026-05-05 08:00:00</p>
+            </div>
+        </div>
+        """
+
+        scraper = MenuUrlScraper()
+
+        with patch("src.scraper.menu_url_scraper.requests.get") as mock_get:
+            mock_response = Mock()
+            mock_response.content = html_content.encode("utf-8")
+            mock_response.raise_for_status = Mock()
+            mock_get.return_value = mock_response
+
+            links = await scraper.fetch_pdf_links()
+
+            # Ordem esperada: 18/05 > 11/05 > 05/05 (pela data do cardápio, não do CMS)
+            assert len(links) == 3
+            assert "46244" in links[0].url  # 18-22/05 (mais recente)
+            assert "46241" in links[1].url  # 11-15/05
+            assert "46239" in links[2].url  # 05-09/05 (mais antigo)
+
+    @pytest.mark.asyncio
+    async def test_sorting_fallback_to_cms_date_when_no_title_date(self):
+        """Quando o título não tem data, deve usar data de atualização como fallback."""
+        html_content = """
+        <div class="ui accordion">
+            <div class="title"><i class="dropdown icon"></i>Cardápio Semanal</div>
+            <div class="content">
+                <p><a class="ui teal button" href='https://documentos.ufca.edu.br/?post_type=doc&p=1'></a></p>
+                <p style='color: #999; font-size: 0.9em;'>Última atualização: 2026-05-11 12:00:00</p>
+            </div>
+        </div>
+        <div class="ui accordion">
+            <div class="title"><i class="dropdown icon"></i>Cardápio Semanal</div>
+            <div class="content">
+                <p><a class="ui teal button" href='https://documentos.ufca.edu.br/?post_type=doc&p=2'></a></p>
+                <p style='color: #999; font-size: 0.9em;'>Última atualização: 2026-05-18 12:00:00</p>
+            </div>
+        </div>
+        """
+
+        scraper = MenuUrlScraper()
+
+        with patch("src.scraper.menu_url_scraper.requests.get") as mock_get:
+            mock_response = Mock()
+            mock_response.content = html_content.encode("utf-8")
+            mock_response.raise_for_status = Mock()
+            mock_get.return_value = mock_response
+
+            links = await scraper.fetch_pdf_links()
+
+            # Sem data no título, fallback para data_atualizacao
+            assert links[0].url.endswith("p=2")  # 2026-05-18 (mais recente)
 
     @pytest.mark.asyncio
     async def test_get_latest_pdf_no_pdfs(self):

@@ -42,7 +42,7 @@ class TestBotFactory:
         from src.main import create_bot
 
         mock_app = MagicMock(spec=Application)
-        mock_app_cls.builder.return_value.token.return_value.build.return_value = mock_app
+        mock_app_cls.builder.return_value.token.return_value.post_init.return_value.build.return_value = mock_app
 
         with patch.dict("os.environ", {"TELEGRAM_BOT_TOKEN": "fake:TOKEN"}):
             app = create_bot()
@@ -93,7 +93,7 @@ class TestBotFactory:
         from telegram.ext import Application, CommandHandler
 
         mock_app = MagicMock(spec=Application)
-        mock_app_cls.builder.return_value.token.return_value.build.return_value = mock_app
+        mock_app_cls.builder.return_value.token.return_value.post_init.return_value.build.return_value = mock_app
 
         with patch.dict("os.environ", {"TELEGRAM_BOT_TOKEN": "fake:TOKEN"}):
             create_bot()
@@ -127,7 +127,7 @@ class TestBotFactory:
         from telegram.ext import Application, CommandHandler
 
         mock_app = MagicMock(spec=Application)
-        mock_app_cls.builder.return_value.token.return_value.build.return_value = mock_app
+        mock_app_cls.builder.return_value.token.return_value.post_init.return_value.build.return_value = mock_app
 
         with patch.dict("os.environ", {"TELEGRAM_BOT_TOKEN": "fake:TOKEN"}):
             create_bot()
@@ -167,7 +167,7 @@ class TestBotFactory:
         from telegram.ext import Application
 
         mock_app = MagicMock(spec=Application)
-        mock_app_cls.builder.return_value.token.return_value.build.return_value = mock_app
+        mock_app_cls.builder.return_value.token.return_value.post_init.return_value.build.return_value = mock_app
 
         with patch.dict("os.environ", {"TELEGRAM_BOT_TOKEN": "fake:TOKEN"}):
             create_bot()
@@ -231,3 +231,129 @@ class TestSchedulerSetup:
 
         # Exatamente 2 jobs diários: almoço e janta
         assert mock_app.job_queue.run_daily.call_count == 2
+
+
+class TestStartupUpdate:
+    """
+    Testes para atualização de cardápio na inicialização do bot.
+
+    O bot deve tentar buscar cardápios da web ao subir,
+    evitando cache vazio em novos containers.
+    """
+
+    @pytest.mark.asyncio
+    async def test_post_init_calls_auto_updater(self):
+        """
+        Teste: post_init deve chamar auto_updater.update_menu_from_web().
+
+        Arrange: Mock de auto_updater e application
+        Act: Chamar post_init
+        Assert: update_menu_from_web foi chamado
+        """
+        from src.main import post_init
+
+        mock_auto_updater = MagicMock()
+        mock_auto_updater.update_menu_from_web = AsyncMock(return_value=True)
+
+        mock_app = MagicMock()
+
+        await post_init(mock_app, mock_auto_updater)
+
+        mock_auto_updater.update_menu_from_web.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_post_init_logs_success(self):
+        """
+        Teste: post_init deve logar sucesso quando atualização funciona.
+
+        Arrange: Mock de auto_updater retornando True
+        Act: Chamar post_init
+        Assert: Log de sucesso presente
+        """
+        from src.main import post_init
+
+        mock_auto_updater = MagicMock()
+        mock_auto_updater.update_menu_from_web = AsyncMock(return_value=True)
+
+        mock_app = MagicMock()
+
+        with patch("src.main.logger") as mock_logger:
+            await post_init(mock_app, mock_auto_updater)
+
+        assert any(
+            "SUCESSO" in str(call) or "atualizado" in str(call).lower()
+            for call in mock_logger.info.call_args_list
+        )
+
+    @pytest.mark.asyncio
+    async def test_post_init_handles_failure_silently(self):
+        """
+        Teste: post_init não deve levantar exceção se atualização falhar.
+
+        Arrange: Mock de auto_updater retornando False
+        Act: Chamar post_init
+        Assert: Não levanta exceção, log de erro presente
+        """
+        from src.main import post_init
+
+        mock_auto_updater = MagicMock()
+        mock_auto_updater.update_menu_from_web = AsyncMock(return_value=False)
+
+        mock_app = MagicMock()
+
+        with patch("src.main.logger") as mock_logger:
+            await post_init(mock_app, mock_auto_updater)
+
+        assert any(
+            "falha" in str(call).lower() or "erro" in str(call).lower()
+            for call in mock_logger.warning.call_args_list
+        )
+
+    @pytest.mark.asyncio
+    async def test_post_init_handles_exception(self):
+        """
+        Teste: post_init deve capturar exceções e não propagar.
+
+        Arrange: Mock de auto_updater levantando exceção
+        Act: Chamar post_init
+        Assert: Não levanta exceção
+        """
+        from src.main import post_init
+
+        mock_auto_updater = MagicMock()
+        mock_auto_updater.update_menu_from_web = AsyncMock(side_effect=Exception("Site fora"))
+
+        mock_app = MagicMock()
+
+        with patch("src.main.logger"):
+            await post_init(mock_app, mock_auto_updater)
+
+    @patch("src.main.Application")
+    @patch("src.main.MenuCache")
+    @patch("src.main.UserManager")
+    @patch("src.main.MenuFormatter")
+    @patch("src.main.BotHandlers")
+    @patch("src.main.NotificationScheduler")
+    def test_create_bot_registers_post_init(
+        self, mock_sched, mock_handlers, mock_fmt, mock_users, mock_cache, mock_app_cls
+    ):
+        """
+        Teste: create_bot deve registrar post_init para atualização na inicialização.
+
+        Arrange: Token válido
+        Act: Chamar create_bot
+        Assert: Application.builder().token().post_init() foi chamado
+        """
+        from src.main import create_bot
+        from telegram.ext import Application
+
+        mock_app = MagicMock(spec=Application)
+        mock_builder = MagicMock()
+        mock_builder.token.return_value = mock_builder
+        mock_builder.build.return_value = mock_app
+        mock_app_cls.builder.return_value = mock_builder
+
+        with patch.dict("os.environ", {"TELEGRAM_BOT_TOKEN": "fake:TOKEN"}):
+            create_bot()
+
+        mock_builder.post_init.assert_called_once()

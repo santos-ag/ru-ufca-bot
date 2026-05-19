@@ -1,6 +1,7 @@
 """Scraper de URLs dos PDFs de cardápio do site oficial UFCA."""
 
 import logging
+import re
 from typing import List, Dict, Optional
 from datetime import datetime
 
@@ -64,7 +65,8 @@ class MenuUrlScraper:
         Scrape da página e extração de URLs dos PDFs.
 
         Retorna:
-            Lista de MenuPdfLink ordenada por data de atualização (mais recente primeiro)
+            Lista de MenuPdfLink ordenada pela data de início do cardápio
+            extraída do título (mais recente primeiro)
 
         Levanta:
             MenuUrlScraperError: Se houver erro de conexão ou parsing
@@ -127,11 +129,16 @@ class MenuUrlScraper:
             if not pdf_links:
                 raise MenuUrlNotFoundError("Nenhum PDF válido foi extraído")
 
-            # Ordena por data de atualização (mais recente primeiro)
-            pdf_links.sort(
-                key=lambda x: x.data_atualizacao if x.data_atualizacao else "",
-                reverse=True
-            )
+            # Ordena pela data de INÍCIO do cardápio extraída do título
+            # (ex: "Cardápio 18/05/2026 a 22/05/2026" → 2026-05-18)
+            # Preferível à data de atualização do documento, que é não-determinística
+            def _extract_start_date(link: MenuPdfLink) -> str:
+                m = re.search(r"(\d{2})/(\d{2})/(\d{4})", link.titulo)
+                if m:
+                    return f"{m.group(3)}-{m.group(2)}-{m.group(1)}"
+                return link.data_atualizacao or ""
+
+            pdf_links.sort(key=_extract_start_date, reverse=True)
 
             logger.info(f"✅ {len(pdf_links)} PDF(s) encontrado(s)")
             return pdf_links
