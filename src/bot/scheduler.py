@@ -26,20 +26,25 @@ class NotificationScheduler:
             return
         
         meal = menu_data[meal_key]
-        prato_principal = meal.get("prato_principal", "")
+        # prato_principal pode ser string ou lista — normaliza pra lista
+        raw_prato = meal.get("prato_principal", "")
+        pratos = raw_prato if isinstance(raw_prato, list) else [raw_prato] if raw_prato else []
         
         user_ids = self.users.get_all_users()
         for user_id in user_ids:
             try:
-                is_fav = prato_principal and self.users.is_favorite(user_id, prato_principal)
+                user_favorites = self.users.get_favorites(user_id)
+                favorite_pratos = [p for p in pratos if p and self.users.is_favorite(user_id, p)]
+                
                 formatted_message, reply_markup = self.formatter.format_meal_with_keyboard(
-                    meal, meal_type, "fav", is_favorite=is_fav
+                    meal, meal_type, "fav", favorites_list=user_favorites
                 )
                 
-                if is_fav:
+                if favorite_pratos:
+                    fav_names = ", ".join(favorite_pratos)
                     formatted_message = (
                         f"🌟 *ALERTA DE FAVORITO!* 🌟\n\n"
-                        f"_{prato_principal}_ está no cardápio de hoje!\n\n"
+                        f"_{fav_names}_ está no cardápio de hoje!\n\n"
                         + formatted_message
                     )
                 
