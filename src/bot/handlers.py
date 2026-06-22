@@ -3,6 +3,7 @@
 import os
 import tempfile
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -22,18 +23,19 @@ MEAL_KEY_MAP = {
 class BotHandlers:
     """Processa comandos do Telegram, integrando cache, usuários e formatador."""
     
-    def __init__(self, menu_cache, user_manager, formatter, auto_updater=None):
+    def __init__(self, menu_cache, user_manager, formatter, auto_updater=None, tz=None):
         self.cache = menu_cache
         self.users = user_manager
         self.formatter = formatter
         self.auto_updater = auto_updater
+        self.tz = tz or ZoneInfo(os.environ.get("TIMEZONE", "America/Fortaleza"))
     
     async def _send_meal_for_today(self, update: Update, meal_type: str, meal_key: str):
         """Busca o cardápio de hoje no cache e responde ao usuário com botões inline."""
         if not update.message:
             return
         
-        today = datetime.now().strftime("%Y-%m-%d")
+        today = datetime.now(self.tz).strftime("%Y-%m-%d")
         menu_data = self.cache.get_menu(today)
         
         if not menu_data or meal_key not in menu_data:
@@ -187,7 +189,7 @@ class BotHandlers:
         success = await self.auto_updater.update_menu_from_web()
 
         if success:
-            today = datetime.now().strftime("%Y-%m-%d")
+            today = datetime.now(self.tz).strftime("%Y-%m-%d")
             menu = self.cache.get_menu(today)
             if menu:
                 await update.message.reply_text(
@@ -308,7 +310,7 @@ class BotHandlers:
             return
 
         user_id = query.from_user.id
-        today = datetime.now().strftime("%Y-%m-%d")
+        today = datetime.now(self.tz).strftime("%Y-%m-%d")
         menu_data = self.cache.get_menu(today)
 
         if not menu_data or meal_key not in menu_data:

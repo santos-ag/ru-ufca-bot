@@ -1,4 +1,4 @@
-"""Entry point do RU UFCA Bot."""
+"""Entry point do Bot."""
 
 import os
 import logging
@@ -45,13 +45,14 @@ def create_bot() -> Application:
     users = UserManager("data/users.json")
     formatter = MenuFormatter()
     auto_updater = AutoMenuUpdater(cache)
-    handlers = BotHandlers(cache, users, formatter, auto_updater)
+    tz = _get_timezone(os.environ.get("TIMEZONE", "America/Fortaleza"))
+    handlers = BotHandlers(cache, users, formatter, auto_updater, tz=tz)
 
     app = Application.builder().token(token).post_init(
         lambda app: post_init(app, auto_updater)
     ).build()
 
-    scheduler = NotificationScheduler(app.bot, cache, users, formatter)
+    scheduler = NotificationScheduler(app.bot, cache, users, formatter, tz=tz)
 
     app.add_handler(CommandHandler("start", handlers.start_command))
     app.add_handler(CommandHandler("almoco", handlers.almoco_command))

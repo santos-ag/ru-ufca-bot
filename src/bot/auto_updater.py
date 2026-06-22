@@ -54,7 +54,7 @@ class AutoMenuUpdater:
             logger.info("🔄 INICIANDO ATUALIZAÇÃO AUTOMÁTICA DE CARDÁPIOS")
             logger.info("=" * 60)
 
-            # 1. Scrape da página UFCA
+            # 1. Scrape na página da UFCA
             logger.info("Passo 1: Scraping de URLs...")
             try:
                 latest_pdf = await self.scraper.get_latest_pdf()
@@ -86,12 +86,24 @@ class AutoMenuUpdater:
                 if tables:
                     logger.debug("Usando extrator baseado em tabelas")
                     extractor = TableMenuExtractor(tables)
+                    weekly_menus = extractor.extract_menus()
+
+                    # Fallback textual se a tabela não produziu cardápios completos
+                    if not weekly_menus or not any('almoco' in m for m in weekly_menus.values()):
+                        logger.debug(
+                            "Tabela não produziu cardápios completos "
+                            f"({len(weekly_menus)} dias, "
+                            f"{sum('almoco' in m for m in weekly_menus.values())} almoços). "
+                            "Tentando extrator textual..."
+                        )
+                        text = parser.extract_text()
+                        extractor = MenuExtractor(text)
+                        weekly_menus = extractor.extract_menus()
                 else:
                     logger.debug("Usando extrator baseado em texto (fallback)")
                     text = parser.extract_text()
                     extractor = MenuExtractor(text)
-
-                weekly_menus = extractor.extract_menus()
+                    weekly_menus = extractor.extract_menus()
 
                 if not weekly_menus:
                     logger.warning("Nenhum cardápio foi extraído do PDF")
