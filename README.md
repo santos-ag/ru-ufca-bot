@@ -2,7 +2,7 @@
 
 Bot de Telegram para consulta de cardápios do Restaurante Universitário da UFCA.
 
-> 💡 **Acesse o bot em produção:** [https://t.me/ru_ufca_bot](https://t.me/ru_ufca_bot)
+> 💡 **Acesse o bot em produção:** [https://t.me/ru_ufca_bot](https://t.me/ufca_ru_bot)
 
 ## 📋 Sobre o Projeto
 
