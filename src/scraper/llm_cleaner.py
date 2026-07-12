@@ -120,7 +120,7 @@ def _build_prompt(raw_data: Dict[str, str]) -> str:
     
     Sua tarefa é limpar esses dados e retornar EXATAMENTE um objeto JSON seguindo estas regras rigorosamente:
     1. Capitalização: Use Title Case para todos os itens (ex: "Escondidinho de Carne", não "ESCONDIDINHO DE CARNE").
-    2. Separação: Se "principal" contiver dois pratos colados (ex: "ESCONDIDINHO DE CARNE FRANGO ACEBOLADO" ou "ISCAS DE PORCO OU FRANGO"), separe-os em uma lista de strings.
+    2. Separação: Se "principal" contiver dois pratos colados (ex: "ESCONDIDINHO DE CARNE FRANGO ACEBOLADO" ou "ISCAS DE PORCO FRANGO"), separe-os em uma lista de strings.
     3. Retorne APENAS um JSON válido. Não adicione crases (```json) ou texto extra.
     
     O schema do JSON de saída DEVE ser estritamente este:

@@ -1,0 +1,6 @@
+Nessa semana (21/06 - 27/06), a equipe dos fornecedores de alimento do RU responsável por escrever semanalmente o cardápio esqueceu de colocar a linha de "almoço";
+Nisso, o cardápio de almoço ficou vazio e o cardápio de janta ficou todo bugado com letras aleatórias.
+
+Sinceramente, não acho que valha o esforço tratar esse tipo de situação.
+
+O que irei fazer agora é retornar uma mensagem de erro amigável para quando isso acontecer (cadápio vazio).
